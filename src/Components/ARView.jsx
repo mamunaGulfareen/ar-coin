@@ -45,17 +45,7 @@ function calculateBearing(lat1, lon1, lat2, lon2) {
   return (brng + 360) % 360;
 }
 
-// Position model in front of user
-function positionModelBasedOnDirection(userPos, coinPos, heading) {
-  if (heading === null) return { x: 0, y: 0, z: -5 };
-  const bearing = calculateBearing(userPos.latitude, userPos.longitude, coinPos.lat, coinPos.lng);
-  const relativeAngle = ((bearing - heading) + 360) % 360;
-  const angleRad = THREE.MathUtils.degToRad(relativeAngle);
-  const distance = 5;
-  const x = Math.sin(angleRad) * distance;
-  const z = -Math.cos(angleRad) * distance;
-  return { x, y: 0, z };
-}
+
 function latLngToPosition(userPos, coinPos) {
   const R = 6371000; // Earth radius in meters
 
@@ -101,33 +91,74 @@ export default function ARView({ coin, onBack }) {
   }, [userLocation]);
 
   // Watch user location
+  // useEffect(() => {
+  //   const watchId = navigator.geolocation.watchPosition(
+  //     (pos) => {
+  //       const { latitude, longitude, heading } = pos.coords;
+  //       setUserLocation({ latitude, longitude });
+  //       if (heading !== null && !isNaN(heading)) {
+  //         setUserHeading(heading); // GPS heading when moving
+  //       }
+  //     },
+  //     (err) => console.error('Geolocation error:', err),
+  //     { enableHighAccuracy: true, maximumAge: 500, timeout: 5000 }
+  //   );
+  //   return () => navigator.geolocation.clearWatch(watchId);
+  // }, []);
   useEffect(() => {
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        setUserLocation({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-        });
-      },
-      (err) => console.error('Geolocation error:', err),
-      { enableHighAccuracy: true, maximumAge: 500, timeout: 5000 }
-    );
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, []);
+  // Function to process new location
+  const handlePosition = (pos) => {
+    const { latitude, longitude, accuracy, heading } = pos.coords;
+
+    // Ignore low-accuracy readings (> 20m)
+    if (accuracy > 20) {
+      console.log(`Skipping low accuracy: ${accuracy}m`);
+      return;
+    }
+
+    setUserLocation({ latitude, longitude });
+
+    // Only update GPS heading if moving
+    if (heading !== null && !isNaN(heading)) {
+      setUserHeading(heading);
+    }
+  };
+
+  // Get initial location quickly
+  navigator.geolocation.getCurrentPosition(
+    handlePosition,
+    (err) => console.error('Initial position error:', err),
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+  );
+
+  // Watch continuous updates
+  const watchId = navigator.geolocation.watchPosition(
+    handlePosition,
+    (err) => console.error('Geolocation watch error:', err),
+    { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+  );
+
+  return () => navigator.geolocation.clearWatch(watchId);
+}, []);
+
 
   // Handle device orientation event listener
   useEffect(() => {
     // Handler for orientation events
     const handleOrientation = (event) => {
       let heading = null;
-      if (event.webkitCompassHeading !== undefined) {
-        // iOS compass heading
+
+      if (isIOS() && typeof event.webkitCompassHeading === 'number') {
+        // iOS gives heading degrees clockwise from North
         heading = event.webkitCompassHeading;
       } else if (event.alpha !== null) {
-        // Non iOS devices
-        heading = 360 - event.alpha;
+        // Android: alpha is 0° when device is pointing north
+        heading = (360 - event.alpha) % 360;
       }
-      if (heading !== null) setUserHeading(heading);
+
+      if (heading !== null && !isNaN(heading)) {
+        setUserHeading(heading);
+      }
     };
 
     if (isIOS()) {
@@ -244,7 +275,8 @@ export default function ARView({ coin, onBack }) {
         );
 
         let angleDiff = Math.abs(((bearingToCoin - userHeading) + 360) % 360);
-        angleDiff = angleDiff > 180 ? 360 - angleDiff : angleDiff;
+        if (angleDiff > 180) angleDiff = 360 - angleDiff;
+
 
         const isNear = distance <= 100;
         const isFacing = angleDiff <= 20; // your tighter angle range

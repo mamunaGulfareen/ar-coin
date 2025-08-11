@@ -15,6 +15,7 @@ const COINS = [
   {id: 6, lat: 31.5654144,lng:74.3571456},
   {id: 7, lat:31.559992487574895, lng:74.39599295296996 },
   {id: 8,lat:30.9723136,lng:73.9704832},
+  {id: 9,lat:31.5293696,lng:74.3243776}
 ];
 
 export default function CoinMap({ onEnterAR }) {
