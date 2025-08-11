@@ -44,6 +44,11 @@ function calculateBearing(lat1, lon1, lat2, lon2) {
   let brng = toDeg(Math.atan2(y, x));
   return (brng + 360) % 360;
 }
+// Utility to smooth values
+function smoothValue(prev, next, smoothingFactor = 0.1) {
+  if (prev === null) return next;
+  return prev + smoothingFactor * (next - prev);
+}
 
 
 function latLngToPosition(userPos, coinPos) {
@@ -91,55 +96,42 @@ export default function ARView({ coin, onBack }) {
   }, [userLocation]);
 
   // Watch user location
-  // useEffect(() => {
-  //   const watchId = navigator.geolocation.watchPosition(
-  //     (pos) => {
-  //       const { latitude, longitude, heading } = pos.coords;
-  //       setUserLocation({ latitude, longitude });
-  //       if (heading !== null && !isNaN(heading)) {
-  //         setUserHeading(heading); // GPS heading when moving
-  //       }
-  //     },
-  //     (err) => console.error('Geolocation error:', err),
-  //     { enableHighAccuracy: true, maximumAge: 500, timeout: 5000 }
-  //   );
-  //   return () => navigator.geolocation.clearWatch(watchId);
-  // }, []);
+
   useEffect(() => {
-  // Function to process new location
-  const handlePosition = (pos) => {
-    const { latitude, longitude, accuracy, heading } = pos.coords;
+    // Function to process new location
+    const handlePosition = (pos) => {
+      const { latitude, longitude, accuracy, heading } = pos.coords;
 
-    // Ignore low-accuracy readings (> 20m)
-    if (accuracy > 20) {
-      console.log(`Skipping low accuracy: ${accuracy}m`);
-      return;
-    }
+      // Ignore low-accuracy readings (> 20m)
+      if (accuracy > 20) {
+        console.log(`Skipping low accuracy: ${accuracy}m`);
+        return;
+      }
 
-    setUserLocation({ latitude, longitude });
+      setUserLocation({ latitude, longitude });
 
-    // Only update GPS heading if moving
-    if (heading !== null && !isNaN(heading)) {
-      setUserHeading(heading);
-    }
-  };
+      // Only update GPS heading if moving
+      if (heading !== null && !isNaN(heading)) {
+        setUserHeading(prev => smoothValue(prev, heading, 0.15)); // adjust 0.05-0.3 for smoothness
+      }
+    };
 
-  // Get initial location quickly
-  navigator.geolocation.getCurrentPosition(
-    handlePosition,
-    (err) => console.error('Initial position error:', err),
-    { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
-  );
+    // Get initial location quickly
+    navigator.geolocation.getCurrentPosition(
+      handlePosition,
+      (err) => console.error('Initial position error:', err),
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+    );
 
-  // Watch continuous updates
-  const watchId = navigator.geolocation.watchPosition(
-    handlePosition,
-    (err) => console.error('Geolocation watch error:', err),
-    { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
-  );
+    // Watch continuous updates
+    const watchId = navigator.geolocation.watchPosition(
+      handlePosition,
+      (err) => console.error('Geolocation watch error:', err),
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+    );
 
-  return () => navigator.geolocation.clearWatch(watchId);
-}, []);
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
 
 
   // Handle device orientation event listener
@@ -157,7 +149,7 @@ export default function ARView({ coin, onBack }) {
       }
 
       if (heading !== null && !isNaN(heading)) {
-        setUserHeading(heading);
+        setUserHeading(prev => smoothValue(prev, heading, 0.15)); // adjust 0.05-0.3 for smoothness
       }
     };
 
@@ -279,11 +271,11 @@ export default function ARView({ coin, onBack }) {
 
 
         const isNear = distance <= 100;
-        const isFacing = angleDiff <= 20; // your tighter angle range
+        const isFacing = angleDiff <= 30; // your tighter angle range
 
         modelRef.current.visible = isNear && isFacing;
 
-        setAngleDiff(angleDiff);
+        setAngleDiff(prev => smoothValue(prev, angleDiff, 0.2));
 
         if (modelRef.current.visible) {
           const relativePos = latLngToPosition(currentLocation, coin);
@@ -430,7 +422,7 @@ export default function ARView({ coin, onBack }) {
         }}
       >
         <div>Angle to coin: {angleDiff !== null ? `${Math.round(angleDiff)}°` : 'N/A'}</div>
-        <div>Facing coin: {angleDiff !== null ? (angleDiff <= 20 ? '✅' : '❌') : 'N/A'}</div>
+        <div>Facing coin: {angleDiff !== null ? (angleDiff <= 30 ? '✅' : '❌') : 'N/A'}</div>
         <div>Distance: {distanceToCoin !== null ? `${distanceToCoin.toFixed(1)} m` : 'N/A'}</div>
         <div>Heading: {userHeading !== null ? `${Math.round(userHeading)}°` : 'N/A'}</div>
       </div>
