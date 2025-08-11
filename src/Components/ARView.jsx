@@ -9,14 +9,14 @@ function isIOS() {
 
 // Haversine formula
 function haversineDistance(lat1, lon1, lat2, lon2) {
-  // console.log('Original inputs:', { lat1, lon1, lat2, lon2 });
+  console.log('Original inputs:', { lat1, lon1, lat2, lon2 });
 
   // Convert to numbers if input is string
   lat1 = typeof lat1 === 'string' ? parseFloat(lat1) : lat1;
   lon1 = typeof lon1 === 'string' ? parseFloat(lon1) : lon1;
   lat2 = typeof lat2 === 'string' ? parseFloat(lat2) : lat2;
   lon2 = typeof lon2 === 'string' ? parseFloat(lon2) : lon2;
-  // console.log('After conversion to numbers:', { lat1, lon1, lat2, lon2 });
+  console.log('After conversion to numbers:', { lat1, lon1, lat2, lon2 });
 
   const toRad = (deg) => (deg * Math.PI) / 180;
   const R = 6371e3; // Earth radius in meters
@@ -27,7 +27,7 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-  // console.log('Calculated distance (meters):', R * c);
+  console.log('Calculated distance (meters):', R * c);
 
   return R * c;
 }
@@ -83,27 +83,12 @@ export default function ARView({ coin, onBack }) {
   const canCollectRef = useRef(false);
   const [angleDiff, setAngleDiff] = useState(null);
   const [iosPermissionGranted, setIosPermissionGranted] = useState(false);
-  const [coinWorldPos, setCoinWorldPos] = useState(null);
-  let smoothBearing = 0;
 
-  function smoothAngleUpdate(newBearing) {
-    // Angle wrap fix (0° and 360° handling)
-    const diff = ((newBearing - smoothBearing + 540) % 360) - 180;
-    smoothBearing = (smoothBearing + diff * 0.1 + 360) % 360;
-    return smoothBearing;
-  }
   // Keep ref to userLocation for animation loop
   const userLocationRef = useRef(null);
   useEffect(() => {
     userLocationRef.current = userLocation;
   }, [userLocation]);
-  useEffect(() => {
-    if (userLocation && !coinWorldPos) {
-      const pos = latLngToPosition(userLocation, coin);
-      console.log('pos', pos);
-      setCoinWorldPos(pos);
-    }
-  }, [userLocation, coin, coinWorldPos]);
 
   // Watch user location
   // useEffect(() => {
@@ -121,40 +106,40 @@ export default function ARView({ coin, onBack }) {
   //   return () => navigator.geolocation.clearWatch(watchId);
   // }, []);
   useEffect(() => {
-    // Function to process new location
-    const handlePosition = (pos) => {
-      const { latitude, longitude, accuracy, heading } = pos.coords;
+  // Function to process new location
+  const handlePosition = (pos) => {
+    const { latitude, longitude, accuracy, heading } = pos.coords;
 
+    // Ignore low-accuracy readings (> 20m)
+    if (accuracy > 20) {
+      console.log(`Skipping low accuracy: ${accuracy}m`);
+      return;
+    }
 
-      // Ignore low-accuracy readings (> 20m)
-      if (accuracy > 20) {
-        console.log(`Skipping low accuracy: ${accuracy}m`);
-        return;
-      }
-      setUserLocation({ latitude, longitude });
+    setUserLocation({ latitude, longitude });
 
-      // Only update GPS heading if moving
-      if (heading !== null && !isNaN(heading)) {
-        setUserHeading(heading);
-      }
-    };
+    // Only update GPS heading if moving
+    if (heading !== null && !isNaN(heading)) {
+      setUserHeading(heading);
+    }
+  };
 
-    // Get initial location quickly
-    navigator.geolocation.getCurrentPosition(
-      handlePosition,
-      (err) => console.error('Initial position error:', err),
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
-    );
+  // Get initial location quickly
+  navigator.geolocation.getCurrentPosition(
+    handlePosition,
+    (err) => console.error('Initial position error:', err),
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+  );
 
-    // Watch continuous updates
-    const watchId = navigator.geolocation.watchPosition(
-      handlePosition,
-      (err) => console.error('Geolocation watch error:', err),
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
-    );
+  // Watch continuous updates
+  const watchId = navigator.geolocation.watchPosition(
+    handlePosition,
+    (err) => console.error('Geolocation watch error:', err),
+    { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+  );
 
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, []);
+  return () => navigator.geolocation.clearWatch(watchId);
+}, []);
 
 
   // Handle device orientation event listener
@@ -288,9 +273,6 @@ export default function ARView({ coin, onBack }) {
           coin.lat,
           coin.lng
         );
-        const smoothAngle = smoothAngleUpdate(bearingToCoin);
-
-
 
         let angleDiff = Math.abs(((bearingToCoin - userHeading) + 360) % 360);
         if (angleDiff > 180) angleDiff = 360 - angleDiff;
@@ -303,10 +285,11 @@ export default function ARView({ coin, onBack }) {
 
         setAngleDiff(angleDiff);
 
-
         if (modelRef.current.visible) {
-          modelRef.current.position.set(coinWorldPos.x, coinWorldPos.y, coinWorldPos.z);
-          modelRef.current.rotation.y = THREE.MathUtils.degToRad(smoothAngle);
+          const relativePos = latLngToPosition(currentLocation, coin);
+          modelRef.current.position.set(relativePos.x, relativePos.y, relativePos.z);
+
+          modelRef.current.rotation.y += 0.01;
         }
       }
 
