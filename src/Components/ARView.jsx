@@ -265,7 +265,7 @@ export default function ARView({ coin, onBack }) {
 
 
         const isNear = distance <= 100;
-        const isFacing = angleDiff <= 20; // your tighter angle range
+        const isFacing = angleDiff <= 30; // your tighter angle range
 
         modelRef.current.visible = isNear && isFacing;
 
@@ -416,7 +416,7 @@ export default function ARView({ coin, onBack }) {
         }}
       >
         <div>Angle to coin: {angleDiff !== null ? `${Math.round(angleDiff)}°` : 'N/A'}</div>
-        <div>Facing coin: {angleDiff !== null ? (angleDiff <= 20 ? '✅' : '❌') : 'N/A'}</div>
+        <div>Facing coin: {angleDiff !== null ? (angleDiff <= 30 ? '✅' : '❌') : 'N/A'}</div>
         <div>Distance: {distanceToCoin !== null ? `${distanceToCoin.toFixed(1)} m` : 'N/A'}</div>
         <div>Heading: {userHeading !== null ? `${Math.round(userHeading)}°` : 'N/A'}</div>
       </div>
