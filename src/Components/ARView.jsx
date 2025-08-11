@@ -102,7 +102,7 @@ export default function ARView({ coin, onBack }) {
     const handlePosition = (pos) => {
       const { latitude, longitude, accuracy, heading } = pos.coords;
 
-      
+
 
       setUserLocation(prev => prev
         ? {
@@ -240,6 +240,7 @@ export default function ARView({ coin, onBack }) {
       undefined,
       (err) => console.error('Model loading error:', err)
     );
+    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
 
     const animate = () => {
       animationFrameIdRef.current = requestAnimationFrame(animate);
@@ -271,29 +272,23 @@ export default function ARView({ coin, onBack }) {
 
         setAngleDiff(prev => smoothValue(prev, angleDiff, 0.15));
 
-        const isNear = distance <= 100;
-
-        // Yahan max angle define kar rahe hain jisme coin dikhega
-        const maxAngle = 60; // degree, isse adjust kar sakte hain
+        const maxAngle = 90; // Visibility max angle, increase for smoother partial visibility
         const normalizedAngle = Math.min(angleDiff / maxAngle, 1); // 0 to 1
 
-        // Scale aur opacity ko angle ke mutabiq change karen (1 to 0.2 scale)
-        const scale = 1 - normalizedAngle * 0.8;  // from 1 to 0.2
-        const opacity = 1 - normalizedAngle;       // from 1 to 0
+        const opacity = 1 - easeOutCubic(normalizedAngle); // smoothly fade out opacity
+        const scale = 0.2 + (1 - easeOutCubic(normalizedAngle)) * 0.8; // scale from 0.2 to 1
 
-        // Coin sirf tab dikhega jab distance pass ho aur angle bhi chhota ho
+        const isNear = distance <= 100;
         const shouldShow = isNear && angleDiff <= maxAngle;
+
         modelRef.current.visible = shouldShow;
 
         if (shouldShow) {
-          // Position set karen
           const relativePos = latLngToPosition(currentLocation, coin);
           modelRef.current.position.set(relativePos.x, relativePos.y, relativePos.z);
 
-          // Scale update karen
           modelRef.current.scale.set(scale, scale, scale);
 
-          // Opacity update karen (agar material opacity support karta ho)
           modelRef.current.traverse((child) => {
             if (child.material) {
               child.material.transparent = true;
@@ -301,7 +296,6 @@ export default function ARView({ coin, onBack }) {
             }
           });
 
-          // Thodi rotation bhi rakhen (optional)
           modelRef.current.rotation.y += 0.01;
         }
       }
@@ -447,6 +441,7 @@ export default function ARView({ coin, onBack }) {
         <div>Facing coin: {angleDiff !== null ? (angleDiff <= 30 ? '✅' : '❌') : 'N/A'}</div>
         <div>Distance: {distanceToCoin !== null ? `${distanceToCoin.toFixed(1)} m` : 'N/A'}</div>
         <div>Heading: {userHeading !== null ? `${Math.round(userHeading)}°` : 'N/A'}</div>
+
       </div>
     </div>
   );
