@@ -105,11 +105,11 @@ export default function ARView({ coin, onBack }) {
     const handlePosition = (pos) => {
       const { latitude, longitude, accuracy, heading } = pos.coords;
 
-      // Ignore low-accuracy readings (> 20m)
-      if (accuracy > 20) {
-        console.log(`Skipping low accuracy: ${accuracy}m`);
-        return;
-      }
+      // // Ignore low-accuracy readings (> 20m)
+      // if (accuracy > 20) {
+      //   console.log(`Skipping low accuracy: ${accuracy}m`);
+      //   return;
+      // }
 
       setUserLocation(prev => prev
         ? {
