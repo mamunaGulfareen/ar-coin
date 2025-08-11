@@ -15,6 +15,7 @@ const COINS = [
   {id: 6, lat: 31.5654144,lng:74.3571456},
   {id: 7, lat:31.559992487574895, lng:74.39599295296996 },
   {id: 8,lat:30.9723136,lng:73.9704832},
+  {id:9,lat:31.5293698,lng:74.3243778}
 ];
 
 export default function CoinMap({ onEnterAR }) {
@@ -87,25 +88,32 @@ export default function CoinMap({ onEnterAR }) {
 
   // Handler for "Enter AR View" button
   const handleARClick = () => {
-    if (!userLocation) {
-      showWarningAlert('📍 Location not available.', 'OK');
-      return;
-    }
+  if (!userLocation) {
+    showWarningAlert('📍 Location not available.', 'OK');
+    return;
+  }
 
-    const nearCoin = COINS.find((coin) => {
-      const dist = haversineDistance(userLocation, {
-        latitude: coin.lat,
-        longitude: coin.lng,
-      });
-      return dist < 500;
+  let closestCoin = null;
+  let closestDist = Infinity;
+
+  COINS.forEach((coin) => {
+    const dist = haversineDistance(userLocation, {
+      latitude: coin.lat,
+      longitude: coin.lng,
     });
-
-    if (nearCoin) {
-      onEnterAR(nearCoin);
-    } else {
-      showWarningAlert('📍You are too far from any coin.', 'Got it');
+    if (dist < closestDist) {
+      closestDist = dist;
+      closestCoin = coin;
     }
-  };
+  });
+
+  if (closestCoin && closestDist < 500) {
+    onEnterAR(closestCoin);
+  } else {
+    showWarningAlert('📍You are too far from any coin.', 'Got it');
+  }
+};
+
 
   return (
     <div className="relative h-screen">

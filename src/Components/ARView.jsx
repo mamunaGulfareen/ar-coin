@@ -45,9 +45,9 @@ function calculateBearing(lat1, lon1, lat2, lon2) {
   return (brng + 360) % 360;
 }
 // Utility to smooth values
-function smoothValue(prev, next, smoothingFactor = 0.1) {
-  if (prev === null) return next;
-  return prev + smoothingFactor * (next - prev);
+function smoothValue(prev, next, smoothingFactor = 0.2) {
+  if (prev === null || isNaN(prev)) return next; // first value
+  return prev + (next - prev) * smoothingFactor;
 }
 
 
@@ -108,8 +108,13 @@ export default function ARView({ coin, onBack }) {
         return;
       }
 
-      setUserLocation({ latitude, longitude });
-
+      setUserLocation(prev => prev
+        ? {
+          latitude: smoothValue(prev.latitude, latitude, 0.2),
+          longitude: smoothValue(prev.longitude, longitude, 0.2)
+        }
+        : { latitude, longitude }
+      );
       // Only update GPS heading if moving
       if (heading !== null && !isNaN(heading)) {
         setUserHeading(prev => smoothValue(prev, heading, 0.15)); // adjust 0.05-0.3 for smoothness
@@ -265,9 +270,10 @@ export default function ARView({ coin, onBack }) {
           coin.lat,
           coin.lng
         );
-
         let angleDiff = Math.abs(((bearingToCoin - userHeading) + 360) % 360);
         if (angleDiff > 180) angleDiff = 360 - angleDiff;
+
+        // Smooth out the angle difference
 
 
         const isNear = distance <= 100;
@@ -275,7 +281,7 @@ export default function ARView({ coin, onBack }) {
 
         modelRef.current.visible = isNear && isFacing;
 
-        setAngleDiff(prev => smoothValue(prev, angleDiff, 0.2));
+        setAngleDiff(prev => smoothValue(prev, angleDiff, 0.15));
 
         if (modelRef.current.visible) {
           const relativePos = latLngToPosition(currentLocation, coin);
