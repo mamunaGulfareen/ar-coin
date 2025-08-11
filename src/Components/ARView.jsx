@@ -72,6 +72,9 @@ function latLngToPosition(userPos, coinPos) {
   return { x, y: 0, z: -z }; // y=0 ground level, negative z to face forward
 }
 
+
+
+
 export default function ARView({ coin, onBack }) {
   const containerRef = useRef();
   const modelRef = useRef(null);
@@ -250,7 +253,8 @@ export default function ARView({ coin, onBack }) {
 
       const currentLocation = userLocationRef.current;
 
-      if (modelRef.current && currentLocation) {
+      if (modelRef.current && currentLocation && userHeading !== null) {
+        // Distance calculate karo
         const distance = haversineDistance(
           currentLocation.latitude,
           currentLocation.longitude,
@@ -258,41 +262,74 @@ export default function ARView({ coin, onBack }) {
           coin.lng
         );
 
-        distanceRef.current = distance;
-        canCollectRef.current = distance <= 100;
-
         setDistanceToCoin(distance);
+        canCollectRef.current = distance <= 100;
         setCanCollect(distance <= 100);
 
+        // Bearing calculate karo coin ki taraf
         const bearingToCoin = calculateBearing(
           currentLocation.latitude,
           currentLocation.longitude,
           coin.lat,
           coin.lng
         );
+
+        // Angle difference user heading aur coin bearing ke beech
         let angleDiff = Math.abs(((bearingToCoin - userHeading) + 360) % 360);
         if (angleDiff > 180) angleDiff = 360 - angleDiff;
 
-        // Smooth out the angle difference
+        // 3D relative position nikaalo
+        const relativePos = latLngToPosition(currentLocation, coin);
 
+        // 3D position ko project karo 2D screen coordinates mein
+        const vector = new THREE.Vector3(relativePos.x, relativePos.y, relativePos.z);
+        vector.project(cameraRef.current);
 
-        const isNear = distance <= 100;
-        const isFacing = angleDiff <= 30; // your tighter angle range
+        // Check karo ke object camera ke view mein hai ke nahi
+        const onScreen = vector.z < 1 && vector.x > -1 && vector.x < 1 && vector.y > -1 && vector.y < 1;
 
-        modelRef.current.visible = isNear && isFacing;
+        // Visibility condition: angle diff, distance, aur camera view check kar ke
+        const visible = angleDiff <= 30 && distance <= 100 && onScreen;
 
-        setAngleDiff(prev => smoothValue(prev, angleDiff, 0.15));
+        modelRef.current.visible = visible;
+        setAngleDiff(angleDiff);
 
-        if (modelRef.current.visible) {
-          const relativePos = latLngToPosition(currentLocation, coin);
+        if (visible) {
+          // Model ki 3D position set karo
           modelRef.current.position.set(relativePos.x, relativePos.y, relativePos.z);
 
+          // Thodi rotation lagao
           modelRef.current.rotation.y += 0.01;
+
+          // Screen position nikaalo pixels mein
+          const screenX = (vector.x + 1) / 2 * window.innerWidth;
+          const screenY = (-vector.y + 1) / 2 * window.innerHeight;
+
+          // Distance from center (0,0) to vector point (x,y)
+          const distFromCenter = Math.sqrt(vector.x * vector.x + vector.y * vector.y);
+          const scale = 1 - Math.min(distFromCenter, 1) * 0.7;
+          modelRef.current.scale.set(scale, scale, scale);
+          if (modelRef.current.material) {
+            modelRef.current.material.opacity = scale;
+            modelRef.current.material.transparent = true;
+          }
+
+
+          // Agar aapko model ka screen position use karna hai (jaise overlay DOM element ke liye), to use kar sakte hain
+          // console.log(`Coin screen position: x=${screenX}px, y=${screenY}px`);
+        }
+
+        // Camera rotation update karo user heading ke mutabiq (sirf yaw)
+        if (cameraRef.current) {
+          const headingRad = (userHeading * Math.PI) / 180;
+          cameraRef.current.rotation.set(0, 0, 0);
+          cameraRef.current.rotation.y = -headingRad;
         }
       }
 
-      renderer.render(scene, camera);
+      rendererRef.current.render(scene, cameraRef.current);
     };
+
 
     const setupCamera = async () => {
       try {
