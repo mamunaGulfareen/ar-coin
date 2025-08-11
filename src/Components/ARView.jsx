@@ -253,7 +253,7 @@ export default function ARView({ coin, onBack }) {
 
       const currentLocation = userLocationRef.current;
 
-      if (modelRef.current && currentLocation && userHeading !== null) {
+      if (modelRef.current && currentLocation) {
         // Distance calculate karo
         const distance = haversineDistance(
           currentLocation.latitude,
