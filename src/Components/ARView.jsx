@@ -102,11 +102,7 @@ export default function ARView({ coin, onBack }) {
     const handlePosition = (pos) => {
       const { latitude, longitude, accuracy, heading } = pos.coords;
 
-      // Ignore low-accuracy readings (> 20m)
-      if (accuracy > 20) {
-        console.log(`Skipping low accuracy: ${accuracy}m`);
-        return;
-      }
+      
 
       setUserLocation(prev => prev
         ? {
@@ -273,26 +269,46 @@ export default function ARView({ coin, onBack }) {
         let angleDiff = Math.abs(((bearingToCoin - userHeading) + 360) % 360);
         if (angleDiff > 180) angleDiff = 360 - angleDiff;
 
-        // Smooth out the angle difference
-
-
-        const isNear = distance <= 100;
-        const isFacing = angleDiff <= 30; // your tighter angle range
-
-        modelRef.current.visible = isNear && isFacing;
-
         setAngleDiff(prev => smoothValue(prev, angleDiff, 0.15));
 
-        if (modelRef.current.visible) {
+        const isNear = distance <= 100;
+
+        // Yahan max angle define kar rahe hain jisme coin dikhega
+        const maxAngle = 60; // degree, isse adjust kar sakte hain
+        const normalizedAngle = Math.min(angleDiff / maxAngle, 1); // 0 to 1
+
+        // Scale aur opacity ko angle ke mutabiq change karen (1 to 0.2 scale)
+        const scale = 1 - normalizedAngle * 0.8;  // from 1 to 0.2
+        const opacity = 1 - normalizedAngle;       // from 1 to 0
+
+        // Coin sirf tab dikhega jab distance pass ho aur angle bhi chhota ho
+        const shouldShow = isNear && angleDiff <= maxAngle;
+        modelRef.current.visible = shouldShow;
+
+        if (shouldShow) {
+          // Position set karen
           const relativePos = latLngToPosition(currentLocation, coin);
           modelRef.current.position.set(relativePos.x, relativePos.y, relativePos.z);
 
+          // Scale update karen
+          modelRef.current.scale.set(scale, scale, scale);
+
+          // Opacity update karen (agar material opacity support karta ho)
+          modelRef.current.traverse((child) => {
+            if (child.material) {
+              child.material.transparent = true;
+              child.material.opacity = opacity;
+            }
+          });
+
+          // Thodi rotation bhi rakhen (optional)
           modelRef.current.rotation.y += 0.01;
         }
       }
 
       renderer.render(scene, camera);
     };
+
 
     const setupCamera = async () => {
       try {
