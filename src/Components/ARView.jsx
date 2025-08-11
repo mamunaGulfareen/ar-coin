@@ -90,21 +90,7 @@ export default function ARView({ coin, onBack }) {
     userLocationRef.current = userLocation;
   }, [userLocation]);
 
-  // Watch user location
-  // useEffect(() => {
-  //   const watchId = navigator.geolocation.watchPosition(
-  //     (pos) => {
-  //       const { latitude, longitude, heading } = pos.coords;
-  //       setUserLocation({ latitude, longitude });
-  //       if (heading !== null && !isNaN(heading)) {
-  //         setUserHeading(heading); // GPS heading when moving
-  //       }
-  //     },
-  //     (err) => console.error('Geolocation error:', err),
-  //     { enableHighAccuracy: true, maximumAge: 500, timeout: 5000 }
-  //   );
-  //   return () => navigator.geolocation.clearWatch(watchId);
-  // }, []);
+
   useEffect(() => {
   // Function to process new location
   const handlePosition = (pos) => {
