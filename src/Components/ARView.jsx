@@ -83,12 +83,19 @@ export default function ARView({ coin, onBack }) {
   const canCollectRef = useRef(false);
   const [angleDiff, setAngleDiff] = useState(null);
   const [iosPermissionGranted, setIosPermissionGranted] = useState(false);
+  const [coinWorldPos, setCoinWorldPos] = useState(null);
 
   // Keep ref to userLocation for animation loop
   const userLocationRef = useRef(null);
   useEffect(() => {
     userLocationRef.current = userLocation;
-  }, [userLocation]);
+    if (userLocation && !coinWorldPos) {
+      const pos = latLngToPosition(userLocation, coin);
+      setCoinWorldPos(pos);
+    }
+  }, [userLocation, coin, coinWorldPos]);
+
+
 
   // Watch user location
   // useEffect(() => {
@@ -106,40 +113,40 @@ export default function ARView({ coin, onBack }) {
   //   return () => navigator.geolocation.clearWatch(watchId);
   // }, []);
   useEffect(() => {
-  // Function to process new location
-  const handlePosition = (pos) => {
-    const { latitude, longitude, accuracy, heading } = pos.coords;
+    // Function to process new location
+    const handlePosition = (pos) => {
+      const { latitude, longitude, accuracy, heading } = pos.coords;
 
-    // Ignore low-accuracy readings (> 20m)
-    if (accuracy > 20) {
-      console.log(`Skipping low accuracy: ${accuracy}m`);
-      return;
-    }
+      // Ignore low-accuracy readings (> 20m)
+      if (accuracy > 20) {
+        console.log(`Skipping low accuracy: ${accuracy}m`);
+        return;
+      }
 
-    setUserLocation({ latitude, longitude });
+      setUserLocation({ latitude, longitude });
 
-    // Only update GPS heading if moving
-    if (heading !== null && !isNaN(heading)) {
-      setUserHeading(heading);
-    }
-  };
+      // Only update GPS heading if moving
+      if (heading !== null && !isNaN(heading)) {
+        setUserHeading(heading);
+      }
+    };
 
-  // Get initial location quickly
-  navigator.geolocation.getCurrentPosition(
-    handlePosition,
-    (err) => console.error('Initial position error:', err),
-    { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
-  );
+    // Get initial location quickly
+    navigator.geolocation.getCurrentPosition(
+      handlePosition,
+      (err) => console.error('Initial position error:', err),
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+    );
 
-  // Watch continuous updates
-  const watchId = navigator.geolocation.watchPosition(
-    handlePosition,
-    (err) => console.error('Geolocation watch error:', err),
-    { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
-  );
+    // Watch continuous updates
+    const watchId = navigator.geolocation.watchPosition(
+      handlePosition,
+      (err) => console.error('Geolocation watch error:', err),
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+    );
 
-  return () => navigator.geolocation.clearWatch(watchId);
-}, []);
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
 
 
   // Handle device orientation event listener
@@ -253,7 +260,7 @@ export default function ARView({ coin, onBack }) {
 
       const currentLocation = userLocationRef.current;
 
-      if (modelRef.current && currentLocation) {
+      if (modelRef.current && currentLocation && coinWorldPos) {
         const distance = haversineDistance(
           currentLocation.latitude,
           currentLocation.longitude,
@@ -262,10 +269,10 @@ export default function ARView({ coin, onBack }) {
         );
 
         distanceRef.current = distance;
-        canCollectRef.current = distance <= 100;
-
         setDistanceToCoin(distance);
+        canCollectRef.current = distance === 0;
         setCanCollect(distance <= 100);
+
 
         const bearingToCoin = calculateBearing(
           currentLocation.latitude,
@@ -276,19 +283,15 @@ export default function ARView({ coin, onBack }) {
 
         let angleDiff = Math.abs(((bearingToCoin - userHeading) + 360) % 360);
         if (angleDiff > 180) angleDiff = 360 - angleDiff;
-
+        setAngleDiff(angleDiff);
 
         const isNear = distance <= 100;
-        const isFacing = angleDiff <= 20; // your tighter angle range
+        const isFacing = angleDiff <= 20;
 
         modelRef.current.visible = isNear && isFacing;
 
-        setAngleDiff(angleDiff);
-
         if (modelRef.current.visible) {
-          const relativePos = latLngToPosition(currentLocation, coin);
-          modelRef.current.position.set(relativePos.x, relativePos.y, relativePos.z);
-
+          modelRef.current.position.set(coinWorldPos.x, coinWorldPos.y, coinWorldPos.z);
           modelRef.current.rotation.y += 0.01;
         }
       }
